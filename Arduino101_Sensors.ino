@@ -2,20 +2,26 @@
 //Load Includes
 //*****************
 #include <DHT.h>
-#include <CurieIMU.h>
+//#include <CurieIMU.h>
 #include <ELClient.h>
 #include <ELClientRest.h>
 #include <neotimer.h>
 
-// General variables
-const int serialSpeed = 38400;
+#define ESPBootTime 10
 
-// ESP-Link client initialization
-ELClient esp(&Serial1, &Serial1);
+ELClient esp(&Serial, &Serial);
+
+// General variables
+const int serialSpeed = 9600;
+
 ELClientRest rest(&esp);
 boolean wifiConnected = false;
-#define BUFLEN 266                                    //Data buffer
+#define BUFLEN 266                                    // Data buffer
 #define api_key "eaaeebace112754929d81074576e9e1b"    // NubeIoT API Key
+
+//Optoisolator pin
+#define optoPin 7
+
 
 // Temperature sensor initialization
 #define DHTPIN 2        // what digital pin we're connected to
@@ -35,13 +41,33 @@ float lastAccel = 0;
 float lastGasQ = 0;
 float lastTime=0;
 
-// Timers initializstion
+// Timers initializastion
 Neotimer dhtTimer = Neotimer(500);
 
 // Initial Setup
 void setup() {
   Serial.begin(serialSpeed);    // USB serial for debugging messages
-  Serial1.begin(serialSpeed);   // Hardware serial for communication with ESP8266 (Arduino 101 uses Serial1)
+
+  /*
+  #ifdef SOFTSERIAL
+    ESPSerial.begin(serialSpeed);
+  #endif
+  */
+  //#ifdef HARDSERIAL
+    //Serial1.begin(serialSpeed);   // Hardware serial for communication with ESP8266 (Arduino 101 uses Serial1)
+  //#endif 
+  
+  Serial.println("Waiting for ESP to boot...");
+  for(int x = ESPBootTime; x > 0; x--){
+    Serial.print(x);
+    Serial.println("...");
+    delay(1000);
+  }
+  
+  //Set optocoupler pint to output and send HIGH signal
+  pinMode(optoPin, OUTPUT);     
+  digitalWrite(optoPin, HIGH);  // Set optoisolator pin to high to enable serial transmission
+  Serial.println("Serial communication enabled...");
 
   // Start wifi connection code //
   Serial.println("");
@@ -82,9 +108,9 @@ void setup() {
   
   // Setup IMU
   Serial.println("Initializing IMU device...");
-  CurieIMU.begin();
+  //CurieIMU.begin();
   // Set the accelerometer range to 2G
-  CurieIMU.setAccelerometerRange(4);
+  //CurieIMU.setAccelerometerRange(4);
 
   // Setup DHT11
   Serial.println("Initializing DHT11 sensor...");
@@ -101,11 +127,11 @@ void wifiCb(void *response) {
     res->popArg(&status, 1);
 
     if(status == STATION_GOT_IP) {
-      Serial1.println("WIFI CONNECTED");
+      Serial.println("WIFI CONNECTED");
       wifiConnected = true;
     } else {
-      Serial1.print("WIFI NOT READY: ");
-      Serial1.println(status);
+      Serial.print("WIFI NOT READY: ");
+      Serial.println(status);
       wifiConnected = false;
     }
   }
@@ -130,8 +156,8 @@ void loop() {
       dhtTimer.start();
     }
     // Read IMU
-    CurieIMU.readAccelerometerScaled(ax, ay, az);
-    lastAccel=az;
+    //CurieIMU.readAccelerometerScaled(ax, ay, az);
+    //lastAccel=az;
   
     //Serial.print (lastTime);
     //Serial.print (" ");
@@ -180,11 +206,11 @@ void loop() {
     uint16_t code = rest.waitResponse(response, BUFLEN-1);
     // Check the response from Thingspeak
     if(code == HTTP_STATUS_OK){
-      Serial.println("Thingspeak: POST successful:");
+      Serial.println("POST successful:");
       Serial.print("Response: ");
       Serial.println(response);
     } else {
-      Serial.print("Thingspeak: POST failed with error ");
+      Serial.print("POST failed with error ");
       Serial.println(code);
       Serial.print("Response: ");
       Serial.println(response);
