@@ -9,6 +9,19 @@ by the following members of Makerspace Puerto Rico (https://www.facebook.com/sea
   
   Made for the Intel Hacks 2017 Hackathon. Submitted on 07/27/2017.
   
+  Description: 
+  This sketch takes readings from a temperature/humidity sensor (DHT11), a gas quality sensor (MQ-2), and the Arduino 101's Accelerometer.
+  The data is collected real time and sent over WiFi to a remove web server using an ESP-01 (ESP8266) module. The ESP-01 is used as a
+  slave WiFi module to communicate with the server every 2 seconds (for testing purposes). This time interval should be canged to something
+  more realistic, as taking data every 2 seconds can generate a lot of data over the day.
+  
+  Action Items:
+  -Add earthquake detection algorithm.
+  -Add seismic data (time-accelerations) transmittal algorithm (right now it only sends data every two seconds. It will send real-time
+   data in packages when an earthquake is detected, in order to provide scientific data).
+  -Implement a buzzer alarm to tell the user when either smoke, propane, or CO2 is detected, and when an earthquake is detected.
+  
+  Note:
   This code is designed to work with the Arduino 101 board, but it should work fine in other boards with a Serial1 interface.
   It can also be easily adapted to work with any Arduino board, albeit with the requirement of using Software Serial in some cases.
 */
