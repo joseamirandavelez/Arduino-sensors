@@ -1,26 +1,45 @@
+/*
+Arduino code for Salvation Module
+by the following members of Makerspace Puerto Rico (https://www.facebook.com/search/str/makerspace+pr)
+  José Miranda
+  Ramiro Vidal
+  Alex Martínez
+  Edwin Delgado
+  Damaso Cardenales
+  
+  Made for the Intel Hacks 2017 Hackathon. Submitted on 07/27/2017.
+  
+  This code is designed to work with the Arduino 101 board, but it should work fine in other boards with a Serial1 interface.
+  It can also be easily adapted to work with any Arduino board, albeit with the requirement of using Software Serial in some cases.
+*/
+
+
 //*****************
 //Load Includes
 //*****************
 #include <DHT.h>
 #include <CurieIMU.h>
-#include <neotimer.h>
+#include <neotimer.h>   //https://github.com/jrullan/neotimer
 
 // Access Point Info
-String ssid ="Miranda_Net_Arris";
-String password="cafeconleche";
+String ssid ="SSID";
+String password="PASSWORD";
 
 // Api information
-String token = "58156522556c68d0963a3906b7f0c033";
-String apiServer ="api.nubeiot.com";
+String HOST_NAME = "API_URL";
+String HOST_PORT = "80";
+String token = "API_Token";
 
-// General variables
-const int serialSpeed = 115200;
+
+// System Variables for Operation
 boolean connected = false;
-#define CONNECT_ATTEMPTS 10       // Atemps to connect to AP
+
+// Atemps to connect to AP
+#define CONNECT_ATTEMPTS 10
 
 // Temperature sensor initialization
-#define DHTPIN 3        // what digital pin we're connected to
-#define DHTTYPE DHT11   // DHT 11
+#define DHTPIN 3
+#define DHTTYPE DHT11
 DHT dht(DHTPIN, DHTTYPE);
 
 // Accelerometer initialization
@@ -36,22 +55,21 @@ float lastAccel = 0;
 float lastGasQ = 0;
 float lastTime=0;
 
-// Timers initializastion
+// Timers initialization
 Neotimer dhtTimer = Neotimer(500);
 
-// Timers initializastion
-Neotimer apiTimer = Neotimer(60000);
+// Timers initialization (Set to 2 seconds for testing purposes. Should be changed to 5 minutes.)
+Neotimer apiTimer = Neotimer(2000);
 
 // Initial Setup
 void setup() {
-  Serial.begin(9600);    // USB serial for debugging messages
-  Serial1.begin(serialSpeed);   // Serial1 (hardware serial) on Arduino 101
- 
+  Serial.begin(9600);      // USB serial for debugging messages
+  Serial1.begin(115200);   // Serial1 (hardware serial) on Arduino 101
+
   Serial.print("Loading...");
   Serial1.println("AT+RST");
   delay(1000);
   
-  boolean connected = false;
   // try to establish a connection
   Serial.print("Connecting to Wifi...");
   for (int i = 0; i < CONNECT_ATTEMPTS; i++) {
@@ -63,17 +81,12 @@ void setup() {
       break;
     }
   }
-  if(connected == true){
-    // Count for delay get ip dhcp bla bla bla...
-    Serial.print("Adquiring DHCP");
-    for(int i=0; i < 5; i ++){
-      Serial.print(".");
-      delay(1000);
-    }
-  } else {
-    Serial.println("Unable to Connect after 10 tries. Go figure... :(");
+
+  if(connected == false){
+    Serial.println("Unable to Connect :(");
   }
-  // End wifi connection code //
+
+  while(!connected)
   
   // Setup IMU
   Serial.println("Initializing IMU device...");
@@ -111,28 +124,52 @@ void loop() {
   lastAccel=az;
 
   if(apiTimer.done()) {
-    // Send data to NubeIoT
-    boolean answer = sendData();
-    
-    // Timer reset
-    apiTimer.reset();
-    apiTimer.start();
+    if(connected) {
+      // Send data to NubeIoT
+      sendData();
+      // Timer reset
+      apiTimer.reset();
+      apiTimer.start();
+    } else {
+      Serial.print (lastTemp);
+      Serial.print (" ");
+      Serial.print (lastHumid);
+      Serial.print (" ");
+      Serial.print (lastAccel);
+      Serial.print (" ");
+      Serial.println (lastGasQ);
+    }
   }
+}
 
-  //Serial.print (lastTime);
-  //Serial.print (" ");
-  Serial.print (lastTemp);
-  Serial.print (" ");
-  Serial.print (lastHumid);
-  Serial.print (" ");
-  Serial.print (lastAccel);
-  Serial.print (" ");
-  Serial.println (lastGasQ);
+boolean sendData(){
+  String cmd = "AT+CIPSTART=\"TCP\",\"" + HOST_NAME +"\",80";
+  
+  String path_data;
+  path_data = "GET /?token=" + token;
+  path_data = path_data + "&Temperature=" + lastTemp;
+  path_data = path_data + "&Humidity=" + lastHumid;
+  path_data = path_data + "&gasQuality=" + lastTemp;
+  path_data = path_data + "&Acceleration=" + lastAccel;
+  path_data = path_data + " HTTP/1.0\r\nHost: " + HOST_NAME + "\r\nConnection: close\r\n\r\n";
+  
+  Serial.println("Opening TCP connection to " + HOST_NAME + "...");
+
+  Serial.print("Sending data...  ");
+  Serial1.println(cmd);
+  delay(500);
+  Serial1.print("AT+CIPSEND=");
+  Serial1.println(path_data.length());
+  delay(1000);
+  Serial1.println(path_data);
+
+  Serial1.println("AT+CIPCLOSE");
+  Serial.println("Done!");
 }
 
 boolean wifiConnect(){
   Serial1.println("AT+CWMODE=1");
-  Serial1.println("AT+CWJAP=\"" + ssid + "\",\"" + password + "\"" );
+  Serial1.println("AT+CWJAP=\"" +ssid+"\",\"" + password + "\"" );
  
   delay(2000);
   if (Serial1.find("OK")) {
@@ -140,32 +177,4 @@ boolean wifiConnect(){
   } else {
   return false;
   }
-}
-
-boolean sendData(){
-  String path_data;
-  path_data = "GET /?token=" + token;
-  path_data = path_data + "&Temperature=" + lastTemp;
-  path_data = path_data + "&Humidity=" + lastHumid;
-  path_data = path_data + "&gasQuality=" + lastGasQ;
-  //path_data = path_data + "&Acceleration=" + lastAccel;
-  path_data = path_data + " HTTP/1.0\r\nHOST: api.nubeiot.com" + "\r\nConnection: close\r\n\r\n";
-  
-  String cmd = "AT+CIPSTART=\"TCP\",\"" + apiServer +"\",80";
-  //String getCmd = "GET /?token=" + token + "&test=999 HTTP/1.0\r\nHost: " + apiServer +"\r\nConnection: close\r\n\r\n" ;
-  Serial.println(cmd);
-  Serial1.println(cmd);
-  delay(500);
-  Serial.print("AT+CIPSEND=");
-  Serial.println( path_data.length() );
-  Serial1.print("AT+CIPSEND=");
-  Serial1.println( path_data.length() );
- 
-  delay(1000);
-  Serial1.println(path_data);
-  Serial.println(path_data);
-  Serial1.println("AT+CIPCLOSE");
-  Serial.println("AT+CIPCLOSE");
-  
-  return true;
 }
